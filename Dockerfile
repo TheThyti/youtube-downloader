@@ -18,19 +18,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
     chmod a+rx /usr/local/bin/yt-dlp
 
-# yt-dlp'ye çerez dosyasını otomatik kullanmasını söyle
-RUN mkdir -p /etc/yt-dlp && echo '--cookies /app/cookies.txt' > /etc/yt-dlp.conf
+# yt-dlp konfigürasyonu (Hem /etc hem kullanıcı dizinine ekliyoruz ki kesin okusun)
+RUN mkdir -p /etc/yt-dlp && \
+    echo '--cookies /app/cookies.txt' > /etc/yt-dlp.conf && \
+    echo '--user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"' >> /etc/yt-dlp.conf && \
+    mkdir -p /root/.config/yt-dlp && \
+    cp /etc/yt-dlp.conf /root/.config/yt-dlp/config
 
 # Çevresel değişkenler
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
+# Dosyaları kopyala
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
 EXPOSE 3000
 
-# ÖNEMLİ: Base64 kodunu çözüp tertemiz bir cookies.txt dosyası oluşturur ve uygulamayı başlatır
+# Base64 çerezlerini dosyaya yaz ve uygulamayı başlat
 CMD sh -c "echo '$YT_COOKIES' | base64 -di > /app/cookies.txt && bun run server.js"
