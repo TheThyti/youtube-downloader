@@ -33,4 +33,4 @@ COPY --from=builder /app/public ./public
 EXPOSE 3000
 
 # ÖNEMLİ: Base64 kodunu çözüp tertemiz bir cookies.txt dosyası oluşturur ve uygulamayı başlatır
-CMD sh -c "echo '$YT_COOKIES' | base64 -d > /app/cookies.txt && bun run server.js"
+CMD sh -c "echo '$YT_COOKIES' | base64 -di > /app/cookies.txt && bun run server.js"
