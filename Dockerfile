@@ -1,59 +1,41 @@
-# Build stage
+# Build aşaması
 FROM oven/bun:1-debian AS builder
-
 WORKDIR /app
-
-# Copy package files
 COPY package.json bun.lock* ./
-
-# Install dependencies
 RUN bun install --frozen-lockfile
-
-# Copy source code
 COPY . .
-
-# Build the application (use next build directly for standalone output compatibility)
 RUN bun next build
 
-# Production stage
+# Çalıştırma aşaması
 FROM debian:bookworm-slim AS runner
-
 WORKDIR /app
 
-# Install dependencies
+# Sistem paketlerini ve bağımlılıkları kur
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    unzip \
     ffmpeg \
     python3 \
-    python3-venv \
+    python3-pip \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp in virtual environment
-RUN python3 -m venv /opt/venv && \
-    /opt/venv/bin/pip install --no-cache-dir yt-dlp
-ENV PATH="/opt/venv/bin:$PATH"
+# yt-dlp'yi doğrudan sisteme (global) kuruyoruz (PATH sorunu olmaması için)
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
+    chmod a+rx /usr/local/bin/yt-dlp
 
-# Install Bun (latest stable)
+# Bun kurulumu
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:$PATH"
 
-# Set environment variables
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
 
-# Copy built application from builder stage
+# Dosyaları kopyala
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Expose port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:3000 || exit 1
-
-# Start the application
+# Render ücretsiz planında sağlık kontrolü bazen sorun çıkarır, basitleştirelim
 CMD ["bun", "run", "server.js"]
