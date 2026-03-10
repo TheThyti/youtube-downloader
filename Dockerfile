@@ -1,4 +1,4 @@
-# Build aşaması
+# 1. Build aşaması (Kodun derlendiği yer)
 FROM oven/bun:1-debian AS builder
 WORKDIR /app
 COPY package.json bun.lock* ./
@@ -6,37 +6,37 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun next build
 
-# Çalıştırma aşaması
-FROM debian:bookworm-slim AS runner
+# 2. Çalıştırma aşaması (Uygulamanın çalıştığı yer)
+FROM oven/bun:1-debian AS runner
 WORKDIR /app
 
-# Sistem paketlerini ve bağımlılıkları kur (UNZIP EKLENDI)
+# Sistem paketlerini kur (ffmpeg ve python yt-dlp için şart)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    unzip \
     ffmpeg \
     python3 \
-    python3-pip \
+    curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# yt-dlp'yi doğrudan sisteme (global) kuruyoruz
+# yt-dlp kurulumu
 RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
     chmod a+rx /usr/local/bin/yt-dlp
 
-# Bun kurulumu (Artık unzip yüklü olduğu için hata vermeyecek)
-RUN curl -fsSL https://bun.sh/install | bash
-ENV PATH="/root/.bun/bin:$PATH"
+# yt-dlp'nin otomatik olarak cookies.txt dosyasını kullanması için konfigürasyon
+RUN mkdir -p /etc/yt-dlp
+RUN echo '--cookies /app/cookies.txt' > /etc/yt-dlp.conf
 
+# Çevresel değişkenler
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-# Dosyaları kopyala
+# Build aşamasından gelen dosyaları kopyala
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
 EXPOSE 3000
 
-# Uygulamayı başlat
-CMD ["bun", "run", "server.js"]
+# ÖNEMLİ: Önce çerezleri dosyaya yaz, sonra sunucuyu başlat
+CMD sh -c "printf '%s' \"$YT_COOKIES\" > /app/cookies.txt && bun run server.js"
